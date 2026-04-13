@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 15px; }
+        .item { height: 100px; background: #ccc; display: flex; align-items: center; justify-content: center; border-radius: 5px; color: #555; font-weight: bold; text-transform: uppercase; }
+        .color-1 { background: #ff9f43; }
+        .color-2 { background: #ee5253; }
+        .color-3 { background: #0abde3; }
+    </style>
+</head>
+<body>
+    <h2>Galeria de Projetos</h2>
+    <p>Visualize os arquivos recentes do seu portfólio:</p>
+    <div class="grid">
+        <div class="item color-1">Projeto A</div>
+        <div class="item color-2">Projeto B</div>
+        <div class="item color-3">Projeto C</div>
+        <div class="item">Projeto D</div>
+    </div>
+</body>
+</html>

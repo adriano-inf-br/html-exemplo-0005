@@ -3,22 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <style>
-        body { font-family: sans-serif; padding: 20px; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 15px; }
-        .item { height: 100px; background: #ccc; display: flex; align-items: center; justify-content: center; border-radius: 5px; color: #555; font-weight: bold; text-transform: uppercase; }
-        .color-1 { background: #ff9f43; }
-        .color-2 { background: #ee5253; }
-        .color-3 { background: #0abde3; }
+        body { font-family: sans-serif; padding: 20px; background-color: #f0f2f5; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; background: white; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background-color: #28a745; color: white; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        .status { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+        .pago { background: #d4edda; color: #155724; }
     </style>
 </head>
 <body>
-    <h2>Galeria de Projetos</h2>
-    <p>Visualize os arquivos recentes do seu portfólio:</p>
-    <div class="grid">
-        <div class="item color-1">Projeto A</div>
-        <div class="item color-2">Projeto B</div>
-        <div class="item color-3">Projeto C</div>
-        <div class="item">Projeto D</div>
-    </div>
+    <h2>Relatório Semanal de Vendas</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Pedido</th>
+                <th>Produto</th>
+                <th>Valor</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>#1024</td>
+                <td>Monitor 24"</td>
+                <td>R$ 850,00</td>
+                <td><span class="status pago">Pago</span></td>
+            </tr>
+            <tr>
+                <td>#1025</td>
+                <td>Teclado Mecânico</td>
+                <td>R$ 320,00</td>
+                <td><span class="status pago">Pago</span></td>
+            </tr>
+        </tbody>
+    </table>
 </body>
 </html>
