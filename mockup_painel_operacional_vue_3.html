@@ -1,0 +1,896 @@
+<template>
+  <div class="painel-operacional">
+    <header class="topo-painel">
+      <div class="topo-painel__titulo">
+        <h1>Painel Operacional de Negócios</h1>
+        <p>Mockup em Vue.js 2 com Element UI, Axios e arraste de cards entre colunas.</p>
+      </div>
+
+      <div class="topo-painel__acoes">
+        <div class="controle-largura">
+          <span class="controle-largura__label">Largura das colunas</span>
+          <el-slider
+            v-model="larguraColuna"
+            :min="260"
+            :max="420"
+            :step="10"
+            show-input
+            input-size="mini"
+          />
+        </div>
+
+        <el-button type="primary" icon="el-icon-plus" @click="abrirModalCriacao">
+          Criar Negócio
+        </el-button>
+      </div>
+    </header>
+
+    <section class="painel-board" :style="estiloBoard">
+      <article
+        v-for="coluna in colunas"
+        :key="coluna.id"
+        class="painel-coluna"
+      >
+        <header class="painel-coluna__cabecalho">
+          <span>{{ coluna.titulo }}</span>
+          <small>{{ totalCardsNaColuna(coluna.id) }} card(s)</small>
+        </header>
+
+        <div class="painel-coluna__usuarios">
+          <div
+            v-for="usuario in coluna.usuarios"
+            :key="`${coluna.id}-${usuario}`"
+            class="usuario-box"
+          >
+            <div class="usuario-box__topo">
+              <span class="usuario-box__nome">{{ usuario }}</span>
+              <span class="usuario-box__contador">{{ cardsPorUsuario(coluna.id, usuario).length }}</span>
+            </div>
+
+            <draggable
+              :list="cardsAgrupados[coluna.id][usuario]"
+              :group="configuracaoDrag"
+              animation="180"
+              ghost-class="drag-ghost"
+              chosen-class="drag-chosen"
+              drag-class="dragging-card"
+              @change="evento => aoMoverCard(evento, coluna.id, usuario)"
+            >
+              <transition-group name="lista-cards" tag="div" class="lista-cards">
+                <div
+                  v-for="card in cardsAgrupados[coluna.id][usuario]"
+                  :key="card.id"
+                  class="card-negocio"
+                  @click="abrirDetalhes(card)"
+                >
+                  <div class="card-negocio__topo" :class="classeStatus(card.status)">
+                    <strong class="card-negocio__codigo">{{ card.codigo }}</strong>
+                    <span class="card-negocio__status-dot"></span>
+                  </div>
+
+                  <div class="card-negocio__conteudo">
+                    <div class="card-negocio__tags">
+                      <span
+                        v-for="tag in card.tags"
+                        :key="`${card.id}-${tag}`"
+                        class="tag"
+                        :class="classeTag(tag)"
+                      >
+                        {{ tag }}
+                      </span>
+                    </div>
+
+                    <div class="card-negocio__cliente">{{ card.cliente }}</div>
+                    <p class="card-negocio__descricao">
+                      {{ card.descricao }}
+                    </p>
+
+                    <div class="card-negocio__rodape">
+                      <span class="card-negocio__datas">
+                        {{ card.dataCriacao }} - {{ card.dataTermino }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </transition-group>
+            </draggable>
+
+            <div v-if="!cardsAgrupados[coluna.id][usuario].length" class="usuario-box__vazio">
+              Sem cards vinculados.
+            </div>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <el-dialog
+      title="Criar Negócio"
+      :visible.sync="modalCriacaoAberta"
+      width="520px"
+      :close-on-click-modal="false"
+    >
+      <el-form label-position="top" :model="formulario" class="formulario-negocio">
+        <el-row :gutter="16">
+          <el-col :xs="24" :sm="24">
+            <el-form-item label="Número Negócio">
+              <el-input v-model.trim="formulario.codigo" placeholder="Ex.: N08335V1R1" />
+            </el-form-item>
+          </el-col>
+
+          <el-col :xs="24" :sm="24">
+            <el-form-item label="Cliente">
+              <el-input v-model.trim="formulario.cliente" placeholder="Nome do cliente" />
+            </el-form-item>
+          </el-col>
+
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="Valor">
+              <el-input v-model.trim="formulario.valor" placeholder="Ex.: R$ 185.000,00" />
+            </el-form-item>
+          </el-col>
+
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="Status">
+              <el-select v-model="formulario.status" placeholder="Selecione" style="width: 100%;">
+                <el-option
+                  v-for="status in statusDisponiveis"
+                  :key="status"
+                  :label="status"
+                  :value="status"
+                />
+              </el-select>
+            </el-form-item>
+          </el-col>
+
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="Coluna">
+              <el-select v-model="formulario.colunaId" placeholder="Selecione" style="width: 100%;">
+                <el-option
+                  v-for="coluna in colunas"
+                  :key="coluna.id"
+                  :label="coluna.titulo"
+                  :value="coluna.id"
+                />
+              </el-select>
+            </el-form-item>
+          </el-col>
+
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="Responsável">
+              <el-select v-model="formulario.usuario" placeholder="Selecione" style="width: 100%;">
+                <el-option
+                  v-for="usuario in usuariosDaColunaSelecionada"
+                  :key="usuario"
+                  :label="usuario"
+                  :value="usuario"
+                />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+      </el-form>
+
+      <span slot="footer" class="dialog-footer">
+        <el-button @click="modalCriacaoAberta = false">Cancelar</el-button>
+        <el-button type="primary" @click="criarNegocio">Salvar</el-button>
+      </span>
+    </el-dialog>
+
+    <el-dialog
+      :title="cardSelecionado ? `${cardSelecionado.codigo} - ${cardSelecionado.cliente}` : 'Detalhes do Negócio'"
+      :visible.sync="modalDetalhesAberta"
+      width="900px"
+    >
+      <div v-if="cardSelecionado" class="modal-detalhes-grid">
+        <section class="bloco-detalhe">
+          <h3 class="bloco-detalhe__titulo">Dados do negócio</h3>
+
+          <div class="detalhe-item"><strong>Número:</strong> <span>{{ cardSelecionado.codigo }}</span></div>
+          <div class="detalhe-item"><strong>Cliente:</strong> <span>{{ cardSelecionado.cliente }}</span></div>
+          <div class="detalhe-item"><strong>Descrição:</strong> <span>{{ cardSelecionado.descricao }}</span></div>
+          <div class="detalhe-item"><strong>Valor:</strong> <span>{{ cardSelecionado.valor }}</span></div>
+          <div class="detalhe-item"><strong>Criação:</strong> <span>{{ cardSelecionado.dataCriacao }}</span></div>
+          <div class="detalhe-item"><strong>Término:</strong> <span>{{ cardSelecionado.dataTermino }}</span></div>
+        </section>
+
+        <section class="bloco-detalhe">
+          <h3 class="bloco-detalhe__titulo">Classificação e fluxo</h3>
+
+          <div class="detalhe-item"><strong>Status:</strong> <span>{{ cardSelecionado.status }}</span></div>
+          <div class="detalhe-item"><strong>Coluna:</strong> <span>{{ tituloColuna(cardSelecionado.colunaId) }}</span></div>
+          <div class="detalhe-item"><strong>Responsável:</strong> <span>{{ cardSelecionado.usuario }}</span></div>
+
+          <div class="bloco-tags">
+            <span
+              v-for="tag in cardSelecionado.tags"
+              :key="`${cardSelecionado.id}-${tag}`"
+              class="tag"
+              :class="classeTag(tag)"
+            >
+              {{ tag }}
+            </span>
+          </div>
+
+          <div class="bloco-equipe">
+            <span
+              v-for="usuario in usuariosColuna(cardSelecionado.colunaId)"
+              :key="`${cardSelecionado.colunaId}-${usuario}`"
+              class="chip-usuario"
+            >
+              {{ usuario }}
+            </span>
+          </div>
+        </section>
+      </div>
+    </el-dialog>
+  </div>
+</template>
+
+<script>
+import axios from 'axios';
+import draggable from 'vuedraggable';
+
+export default {
+  // name: 'PainelOperacionalNegocios',
+  // components: {
+  //   draggable
+  // },
+  data() {
+    return {
+      larguraColuna: 320,
+      modalCriacaoAberta: false,
+      modalDetalhesAberta: false,
+      cardSelecionado: null,
+      configuracaoDrag: {
+        name: 'cards-negocios',
+        pull: true,
+        put: true
+      },
+      statusDisponiveis: ['Novo', 'Em Andamento', 'Revisão', 'Pendente', 'Concluído'],
+      formulario: {
+        codigo: '',
+        cliente: '',
+        valor: '',
+        colunaId: 'comercial-oportunidades',
+        usuario: 'Eduarda',
+        status: 'Novo'
+      },
+      colunas: [
+        {
+          id: 'comercial-oportunidades',
+          titulo: 'Comercial Oportunidades',
+          usuarios: ['Eduarda', 'Egon', 'Fábio', 'Danielle', 'Francielle', 'Renan', 'Otmar']
+        },
+        {
+          id: 'engenharia-gestao',
+          titulo: 'Engenharia Gestão',
+          usuarios: ['Guilherme']
+        },
+        {
+          id: 'engenharia-supervisao',
+          titulo: 'Engenharia Supervisão',
+          usuarios: ['Denner', 'Patrícia']
+        },
+        {
+          id: 'engenharia-orcamento',
+          titulo: 'Engenharia Orçamento',
+          usuarios: ['João', 'Lucas', 'Carol', 'Isabela']
+        },
+        {
+          id: 'aguardando',
+          titulo: 'Aguardando',
+          usuarios: ['Fornecedor', 'Frete']
+        },
+        {
+          id: 'custos',
+          titulo: 'Custos',
+          usuarios: ['Denise']
+        },
+        {
+          id: 'gerencia',
+          titulo: 'Gerência',
+          usuarios: ['Alberto', 'Ricardo']
+        },
+        {
+          id: 'comercial-proposta',
+          titulo: 'Comercial Proposta',
+          usuarios: ['Eduarda', 'Egon', 'Fábio', 'Danielle', 'Francielle', 'Renan', 'Otmar']
+        }
+      ],
+      cardsAgrupados: {
+        'comercial-oportunidades': {
+          Eduarda: [
+            {
+              id: 1,
+              codigo: 'N08331V2R1',
+              cliente: 'Nome do Cliente',
+              descricao: 'Breve descrição do negócio que será apresentado no card para entendimento.',
+              dataCriacao: '18/03/26',
+              dataTermino: '03/04/26',
+              valor: 'R$ 125.000,00',
+              colunaId: 'comercial-oportunidades',
+              usuario: 'Eduarda',
+              status: 'Novo',
+              tags: ['Comercial', 'Urgente']
+            }
+          ],
+          Egon: [],
+          'Fábio': [],
+          Danielle: [],
+          Francielle: [],
+          Renan: [],
+          Otmar: []
+        },
+        'engenharia-gestao': {
+          Guilherme: [
+            {
+              id: 2,
+              codigo: 'N08332V1R1',
+              cliente: 'Nome do Cliente',
+              descricao: 'Breve descrição do negócio que será apresentado no card para entendimento.',
+              dataCriacao: '18/03/26',
+              dataTermino: '03/04/26',
+              valor: 'R$ 280.000,00',
+              colunaId: 'engenharia-gestao',
+              usuario: 'Guilherme',
+              status: 'Em Andamento',
+              tags: ['Engenharia', 'Comercial']
+            }
+          ]
+        },
+        'engenharia-supervisao': {
+          Denner: [
+            {
+              id: 3,
+              codigo: 'N08334V2R3',
+              cliente: 'Nome do Cliente',
+              descricao: 'Breve descrição do negócio que será apresentado no card para entendimento.',
+              dataCriacao: '18/03/26',
+              dataTermino: '03/04/26',
+              valor: 'R$ 96.500,00',
+              colunaId: 'engenharia-supervisao',
+              usuario: 'Denner',
+              status: 'Revisão',
+              tags: ['Engenharia', 'Gerência']
+            }
+          ],
+          'Patrícia': []
+        },
+        'engenharia-orcamento': {
+          'João': [],
+          Lucas: [],
+          Carol: [],
+          Isabela: []
+        },
+        aguardando: {
+          Fornecedor: [
+            {
+              id: 4,
+              codigo: 'N08334V2R3',
+              cliente: 'Nome do Cliente',
+              descricao: 'Breve descrição do negócio que será apresentado no card para entendimento.',
+              dataCriacao: '18/03/26',
+              dataTermino: '03/04/26',
+              valor: 'R$ 47.900,00',
+              colunaId: 'aguardando',
+              usuario: 'Fornecedor',
+              status: 'Pendente',
+              tags: ['Aguardando', 'Custos']
+            }
+          ],
+          Frete: []
+        },
+        custos: {
+          Denise: []
+        },
+        gerencia: {
+          Alberto: [],
+          Ricardo: []
+        },
+        'comercial-proposta': {
+          Eduarda: [],
+          Egon: [],
+          'Fábio': [],
+          Danielle: [],
+          Francielle: [],
+          Renan: [],
+          Otmar: []
+        }
+      }
+    };
+  },
+  computed: {
+    estiloBoard() {
+      return {
+        '--largura-coluna': `${this.larguraColuna}px`
+      };
+    },
+    usuariosDaColunaSelecionada() {
+      const coluna = this.colunas.find(item => item.id === this.formulario.colunaId);
+      return coluna ? coluna.usuarios : [];
+    }
+  },
+  watch: {
+    'formulario.colunaId'(novoValor) {
+      const coluna = this.colunas.find(item => item.id === novoValor);
+      this.formulario.usuario = coluna && coluna.usuarios.length ? coluna.usuarios[0] : '';
+    }
+  },
+  methods: {
+    cardsPorUsuario(colunaId, usuario) {
+      return this.cardsAgrupados[colunaId] && this.cardsAgrupados[colunaId][usuario]
+        ? this.cardsAgrupados[colunaId][usuario]
+        : [];
+    },
+    usuariosColuna(colunaId) {
+      const coluna = this.colunas.find(item => item.id === colunaId);
+      return coluna ? coluna.usuarios : [];
+    },
+    tituloColuna(colunaId) {
+      const coluna = this.colunas.find(item => item.id === colunaId);
+      return coluna ? coluna.titulo : '-';
+    },
+    totalCardsNaColuna(colunaId) {
+      const grupo = this.cardsAgrupados[colunaId] || {};
+      return Object.keys(grupo).reduce((total, usuario) => total + grupo[usuario].length, 0);
+    },
+    classeTag(tag) {
+      const mapa = {
+        Comercial: 'tag--comercial',
+        Engenharia: 'tag--engenharia',
+        Urgente: 'tag--urgente',
+        Custos: 'tag--custos',
+        Aguardando: 'tag--aguardando',
+        'Gerência': 'tag--gerencia'
+      };
+      return mapa[tag] || 'tag--comercial';
+    },
+    classeStatus(status) {
+      const mapa = {
+        Novo: 'status--novo',
+        'Em Andamento': 'status--em-andamento',
+        Revisão: 'status--revisao',
+        Pendente: 'status--pendente',
+        'Concluído': 'status--concluido'
+      };
+      return mapa[status] || 'status--novo';
+    },
+    abrirModalCriacao() {
+      this.modalCriacaoAberta = true;
+    },
+    abrirDetalhes(card) {
+      this.cardSelecionado = JSON.parse(JSON.stringify(card));
+      this.modalDetalhesAberta = true;
+    },
+    criarNegocio() {
+      if (!this.formulario.codigo || !this.formulario.cliente || !this.formulario.valor) {
+        this.$message.warning('Preencha Número Negócio, Cliente e Valor.');
+        return;
+      }
+
+      const novoCard = {
+        id: Date.now(),
+        codigo: this.formulario.codigo,
+        cliente: this.formulario.cliente,
+        descricao: 'Breve descrição do negócio que será apresentado no card para entendimento.',
+        dataCriacao: '18/03/26',
+        dataTermino: '03/04/26',
+        valor: this.formulario.valor,
+        colunaId: this.formulario.colunaId,
+        usuario: this.formulario.usuario,
+        status: this.formulario.status,
+        tags: ['Comercial', 'Urgente']
+      };
+
+      this.cardsAgrupados[this.formulario.colunaId][this.formulario.usuario].unshift(novoCard);
+      this.modalCriacaoAberta = false;
+      this.resetarFormulario();
+      this.$message.success('Negócio criado com sucesso.');
+    },
+    resetarFormulario() {
+      this.formulario = {
+        codigo: '',
+        cliente: '',
+        valor: '',
+        colunaId: 'comercial-oportunidades',
+        usuario: 'Eduarda',
+        status: 'Novo'
+      };
+    },
+    aoMoverCard(evento, colunaIdDestino, usuarioDestino) {
+      if (!evento || !evento.added) {
+        return;
+      }
+
+      const cardMovido = evento.added.element;
+      cardMovido.colunaId = colunaIdDestino;
+      cardMovido.usuario = usuarioDestino;
+
+      //this.sincronizarCard(cardMovido);
+    },
+    sincronizarCard(card) {
+      axios
+        .post('/api/v1/negocios/mover', {
+          id: card.id,
+          coluna_id: card.colunaId,
+          usuario: card.usuario,
+          status: card.status
+        })
+        .then(() => {
+          this.$message.success(`Card ${card.codigo} movido para ${this.tituloColuna(card.colunaId)}.`);
+        })
+        .catch(() => {
+          this.$message.error('Falha ao sincronizar movimentação do card.');
+        });
+    }
+  }
+};
+</script>
+
+<style scoped>
+:root {
+  --cor-fundo: #eef1f5;
+  --cor-superficie: #ffffff;
+  --cor-borda: #d7dde7;
+  --cor-texto: #243447;
+  --cor-texto-suave: #6b7a8c;
+  --cor-header-coluna: #666666;
+  --cor-fundo-coluna: #f9f9f9;
+  --cor-sombra: 0 10px 24px rgba(27, 39, 51, 0.08);
+
+  --tipo-comercial: #355c7d;
+  --tipo-engenharia: #00a896;
+  --tipo-urgente: #ef476f;
+  --tipo-custos: #6a4c93;
+  --tipo-aguardando: #f4a261;
+  --tipo-gerencia: #264653;
+
+  --status-novo: #457b9d;
+  --status-andamento: #2a9d8f;
+  --status-revisao: #f4a261;
+  --status-pendente: #e76f51;
+  --status-concluido: #43aa8b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.painel-operacional {
+  min-height: 100vh;
+  padding: 18px;
+  background: linear-gradient(180deg, #edf1f6 0%, #e5ebf3 100%);
+  color: var(--cor-texto);
+}
+
+.topo-painel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+  padding: 16px 18px;
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: 14px;
+  box-shadow: var(--cor-sombra);
+}
+
+.topo-painel__titulo h1 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.topo-painel__titulo p {
+  margin: 6px 0 0;
+  color: var(--cor-texto-suave);
+  font-size: 13px;
+}
+
+.topo-painel__acoes {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.controle-largura {
+  width: 320px;
+  max-width: 100%;
+  padding: 12px;
+  background: #f7f9fc;
+  border: 1px solid var(--cor-borda);
+  border-radius: 12px;
+}
+
+.controle-largura__label {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.painel-board {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: var(--largura-coluna, 320px);
+  gap: 14px;
+  overflow-x: auto;
+  padding-bottom: 12px;
+}
+
+.painel-coluna {
+  min-width: var(--largura-coluna, 320px);
+  background: var(--cor-fundo-coluna);
+  border: 1px solid #bfc6d1;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: var(--cor-sombra);
+  display: flex;
+  flex-direction: column;
+}
+
+.painel-coluna__cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--cor-header-coluna);
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.painel-coluna__cabecalho small {
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+.painel-coluna__usuarios {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.usuario-box {
+  background: #fff;
+  border: 1px dashed #c4ccd8;
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.usuario-box__topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.usuario-box__nome {
+  font-size: 13px;
+  font-weight: 700;
+  color: #334155;
+}
+
+.usuario-box__contador {
+  min-width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #edf2f7;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.usuario-box__vazio {
+  color: #94a3b8;
+  font-size: 12px;
+  padding-top: 6px;
+}
+
+.lista-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 12px;
+}
+
+.card-negocio {
+  background: #fff;
+  border: 1px solid var(--cor-borda);
+  border-radius: 14px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+
+.card-negocio:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
+}
+
+.card-negocio__topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  color: #fff;
+}
+
+.card-negocio__codigo {
+  font-size: 14px;
+  letter-spacing: 0.3px;
+}
+
+.card-negocio__status-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  border: 2px solid rgba(255, 255, 255, 0.4);
+}
+
+.card-negocio__conteudo {
+  padding: 12px 14px 14px;
+}
+
+.card-negocio__tags,
+.bloco-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.tag {
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.tag--comercial { background: var(--tipo-comercial); }
+.tag--engenharia { background: var(--tipo-engenharia); }
+.tag--urgente { background: var(--tipo-urgente); }
+.tag--custos { background: var(--tipo-custos); }
+.tag--aguardando { background: var(--tipo-aguardando); }
+.tag--gerencia { background: var(--tipo-gerencia); }
+
+.status--novo { background: var(--status-novo); }
+.status--em-andamento { background: var(--status-andamento); }
+.status--revisao { background: var(--status-revisao); }
+.status--pendente { background: var(--status-pendente); }
+.status--concluido { background: var(--status-concluido); }
+
+.card-negocio__cliente {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.card-negocio__descricao {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--cor-texto-suave);
+  line-height: 1.45;
+}
+
+.card-negocio__rodape {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.card-negocio__datas {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #516173;
+  background: #f4f7fb;
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+
+.modal-detalhes-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.bloco-detalhe {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 16px;
+}
+
+.bloco-detalhe__titulo {
+  margin: 0 0 14px;
+  font-size: 15px;
+}
+
+.detalhe-item {
+  margin-bottom: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.bloco-equipe {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.chip-usuario {
+  background: #e9eef6;
+  color: #243447;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 7px 10px;
+}
+
+.drag-ghost {
+  opacity: 0.4;
+}
+
+.drag-chosen {
+  transform: rotate(1deg);
+}
+
+.dragging-card {
+  cursor: grabbing;
+}
+
+.lista-cards-enter-active,
+.lista-cards-leave-active {
+  transition: all 0.2s ease;
+}
+
+.lista-cards-enter,
+.lista-cards-leave-to {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+@media (max-width: 1024px) {
+  .topo-painel {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .topo-painel__acoes {
+    justify-content: space-between;
+  }
+}
+
+@media (max-width: 768px) {
+  .painel-operacional {
+    padding: 12px;
+  }
+
+  .painel-board {
+    display: flex;
+    gap: 12px;
+  }
+
+  .painel-coluna {
+    min-width: min(88vw, var(--largura-coluna, 320px));
+  }
+
+  .controle-largura {
+    width: 100%;
+  }
+
+  .modal-detalhes-grid {
+    grid-template-columns: 1fr;
+  }
+}
+</style>

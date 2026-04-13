@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel Administrativo</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- Botão para abrir menu no Mobile -->
+    <button class="menu-toggle" onclick="toggleMenu()">☰</button>
+
+    <div class="wrapper">
+        <!-- Sidebar -->
+        <nav class="sidebar" id="sidebar">
+            <h2>Menu</h2>
+            <ul>
+                <li><a href="exemplo-001.html" target="content-frame">Exemplo 001</a></li>
+                <li><a href="exemplo-002.html" target="content-frame">Exemplo 002</a></li>
+                <li><a href="exemplo-003.html" target="content-frame">Exemplo 003</a></li>
+            </ul>
+        </nav>
+
+        <!-- Container da Direita -->
+        <main class="content">
+            <iframe name="content-frame" src="exemplo-001.html" frameborder="0"></iframe>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
